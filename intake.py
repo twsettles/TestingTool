@@ -32,7 +32,7 @@ def read_xlsx(file):
 	return data
 	
 def build_db(issues, pathname):
-	with TinyDB(r"C:\Users\p2763554\Documents\Python Scripts\Testing Reporting\db.json") as db:
+	with TinyDB(pathname) as db:
 		if not len(db) > 1:
 			for i, issue in enumerate(issues):
 				db.insert({ISSUE_ID: i, 
