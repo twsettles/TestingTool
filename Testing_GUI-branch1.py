@@ -1,6 +1,6 @@
 from testing_GUI import TestingFrame
 import intake
-import wx, pickle, gettext
+import wx, pickle, gettext, json, os
 from tinydb import TinyDB, Query, where
 
 COLOR ={"light":{"fg":"#000000", 'bg':'#ffffff'}, \
@@ -18,22 +18,26 @@ class TFrame(TestingFrame):
 			
 	def __init__(self, *args, **kwds):
 		import glob
-		import os
 		TestingFrame.__init__(self,*args, **kwds)
 		uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
 		files = glob.glob(uppath(__file__, 1) + os.sep + "*.xlsx")
 		self.root_path = uppath(__file__,1)
+		self.settings = {}
+		self.dark = False
 		
 		database = []
-		dbfile = self.root_path + os.sep + "db.json"
-		filename = self.root_path + os.sep + "updated_best_practices.xlsx"
-		inpt = intake.read_xlsx(filename)
+		self.dbfile = ""
+		self.excel_filename = ""
+		self.load_settings()
+		
+		inpt = intake.read_xlsx(self.root_path + os.sep + self.excel_filename)
 		for sheet in inpt:
 			for row in sheet:
 				database.append(row)
-		intake.build_db(database, dbfile)
-		self.db = TinyDB(dbfile)
+		intake.build_db(database, self.root_path + os.sep+ self.dbfile)
+		self.db = TinyDB(self.root_path + os.sep+ self.dbfile)
 		self.Issue = Query()
+		
 		self.search_dict = \
 		{intake.USER_TYPE: self.choice_user,
 		intake.CATEGORY: self.choice_component,
@@ -56,7 +60,6 @@ class TFrame(TestingFrame):
 			
 		self.isDirty = False #used to save the state of changes
 		self.data = TFrame.Data()
-		self.dark = False
 		self.name = " - TTT"
 		self.setTitle("Untitled")
 		
@@ -398,6 +401,48 @@ class TFrame(TestingFrame):
 		sel_int = choice.FindString(current)
 		#print(sel_int)
 		choice.SetSelection(sel_int)
+	
+	def load_settings(self):
+		settings_file = self.root_path + os.sep + "settings.txt"
+		try:
+			f = open(settings_file, 'r+')
+			string = f.read()
+			f.close()
+		except IOError:
+			string = '{"dark": False, "dbfile":"db.json", "excel_filename":""}'
+		finally:
+			if string:
+				try:
+					settings_handler = eval(string)
+					if not type(settings_handler) == type(dict()):
+						raise KeyError
+				except:
+					settings_handler = {'dark': False, "dbfile":"db.json", "excel_filename":""}
+			else:
+				settings_handler = {'dark': False, "dbfile":"db.json", "excel_filename":""}
+				
+			#dark
+			try:
+				self.settings['dark'] = settings_handler['dark']
+			except KeyError:
+				self.settings['dark'] = False
+			#database file
+			try:
+				self.dbfile = settings_handler['dbfile']
+			except KeyError:
+				self.dbfile = "db.json"
+			
+			#excel source
+			try:
+				self.excel_filename = settings_handler['excel_filename']
+			except KeyError:
+				with wx.FileDialog(self, message="Select an Excel file",	wildcard="Excel  Files (*.xlsx)|*.xlsx", style=wx.FD_OPEN |wx.FD_FILE_MUST_EXIST) as dlg:
+					if dlg.ShowModal() == wx.ID_OK:
+						filename = dlg.GetPath()
+						if filename:
+							self.excel_filename = (filename.split(os.sep))[-1]
+					else:
+						print("No file selected")
 		
 def remove_key(dd, key):
 	r = dict(dd)
