@@ -405,10 +405,10 @@ class TFrame(TestingFrame):
 	def load_settings(self):
 		settings_file = self.root_path + os.sep + "settings.txt"
 		try:
-			f = open(settings_file, 'r+')
+			f = open(settings_file, 'wt')
 			string = f.read()
-			f.close()
 		except IOError:
+			f = open(settings_file, 'wt')
 			string = '{"dark": False, "dbfile":"db.json", "excel_filename":""}'
 		finally:
 			if string:
@@ -435,14 +435,19 @@ class TFrame(TestingFrame):
 			#excel source
 			try:
 				self.excel_filename = settings_handler['excel_filename']
+				if self.excel_filename == "":
+					raise KeyError
 			except KeyError:
-				with wx.FileDialog(self, message="Select an Excel file",	wildcard="Excel  Files (*.xlsx)|*.xlsx", style=wx.FD_OPEN |wx.FD_FILE_MUST_EXIST) as dlg:
+				with wx.FileDialog(self, message="Select an Excel file of the Issue table",	wildcard="Excel  Files (*.xlsx)|*.xlsx", style=wx.FD_OPEN |wx.FD_FILE_MUST_EXIST) as dlg:
 					if dlg.ShowModal() == wx.ID_OK:
 						filename = dlg.GetPath()
 						if filename:
 							self.excel_filename = (filename.split(os.sep))[-1]
 					else:
 						print("No file selected")
+			string = str({'dark': self.dark, 'dbfile': self.dbfile, 'excel_filename':self.excel_filename})
+			f.write(string)
+			f.close()
 		
 def remove_key(dd, key):
 	r = dict(dd)
@@ -454,7 +459,6 @@ def get_name_from_file(file):
 	Given a full file path C:/one/foo.rpt returns foo
 	Used to get the title of the window
 	"""
-	import os
 	broken_file = file.split(os.sep)
 	return (broken_file[-1][:-4])
 
