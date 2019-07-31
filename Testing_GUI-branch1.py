@@ -31,14 +31,15 @@ class TFrame(TestingFrame):
 		import glob
 		TestingFrame.__init__(self,*args, **kwds)
 		uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
-		self.root_path = uppath(__file__,1)
 		self.settings = {}
 		self.dark = False
 		
-		self.dbfile = ""
-		self.load_settings()
+		self.settings_file = 'settings.txt'
+		self.dbfile = ''
+		self.db = None
+		self.load_db()
 		
-		self.db = TinyDB(self.root_path + os.sep+ self.dbfile)
+		#self.load_settings()
 		self.Issue = Query()
 		
 		self.search_dict = \
@@ -509,18 +510,30 @@ class TFrame(TestingFrame):
 		sel_int = choice.FindString(current)
 		choice.SetSelection(sel_int)
 	
-	def load_settings(self):
+	def load_db(self):
+		try:
+			self.db = TinyDB('db.json')
+		except:
+			try:
+				path = self.get_file_path("Open the issues database file", 'json')
+				self.db = TinyDB(path)
+			except:
+				print("everything broke")
+			
+			
+	
+	def load_settings(self): #TODO
 		"""
 		Load settings from "settings.txt"
 		# Not working correctly
 		"""
-		settings_file = self.root_path + os.sep + "settings.txt"
 		try:
-			f = open(settings_file, 'rt')
+			f = open(self.settings_file, 'rt')
 			string = f.read()
 		except IOError:
-			f = open(settings_file, 'wt')
-			string = '{"dark": False, "dbfile":"db.json"}'
+			settings = self.get_file_path('Open the settings file', 'txt')
+			f = open(settings, 'wt')
+			string = '{"dark": False, "dbfile":'+self.dbfile + '}'
 		finally:
 			if string:
 				try:
@@ -536,6 +549,7 @@ class TFrame(TestingFrame):
 				self.settings['dark'] = settings_handler['dark']
 			except KeyError:
 				self.settings['dark'] = False
+			
 			#database file
 			try:
 				self.dbfile = settings_handler['dbfile']
@@ -549,7 +563,15 @@ class TFrame(TestingFrame):
 				f = open(settings_file, 'wt')
 			f.write(string)
 			f.close()
-		
+
+	def get_file_path(self, mess: str, ext: str):
+		wc_str = ext.upper() + ' Files (*.' + ext + ')|*.' + ext
+		with wx.FileDialog(self, message = mess, wildcard=wc_str, style=wx.FD_OPEN |wx.FD_FILE_MUST_EXIST) as dlg:
+				if dlg.ShowModal() == wx.ID_OK:
+					return dlg.GetPath()
+				return "Nah"
+		return "Nope"
+
 def get_name_from_file(file):
 	"""
 	Given a full file path C:/one/foo.rpt returns foo
