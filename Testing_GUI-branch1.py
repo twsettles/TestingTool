@@ -7,6 +7,17 @@ COLOR ={"light":{"fg":"#000000", 'bg':'#ffffff'}, \
 		'dark':{"fg":"#ffffff", 'bg':'#080808'}}
 
 class TFrame(TestingFrame):
+	ISSUE_SUMMARY = "Issue Summary"
+	ISSUE_DESCRIPTION = "Issue Description"
+	STEPS = "Steps to Reproduce"
+	REMEDIATTION = "Remediation"
+	SEVERITY = "Severity"
+	USER_TYPE = intake.USER_TYPE
+	PLATFORM = intake.PLATFORM
+	CATEGORY = intake.CATEGORY
+	BEST_PRACTICE = intake.BEST_PRACTICE
+	WCAG = intake.WCAG
+	
 	class Data():
 		"""
 		Used to be able to save data to/from a file
@@ -15,26 +26,18 @@ class TFrame(TestingFrame):
 			self.pathname = ''
 			self.issue_summary = ''
 			self.user = ''
-			
+	
 	def __init__(self, *args, **kwds):
 		import glob
 		TestingFrame.__init__(self,*args, **kwds)
 		uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
-		files = glob.glob(uppath(__file__, 1) + os.sep + "*.xlsx")
 		self.root_path = uppath(__file__,1)
 		self.settings = {}
 		self.dark = False
 		
-		database = []
 		self.dbfile = ""
-		self.excel_filename = ""
 		self.load_settings()
 		
-		inpt = intake.read_xlsx(self.root_path + os.sep + self.excel_filename)
-		for sheet in inpt:
-			for row in sheet:
-				database.append(row)
-		intake.build_db(database, self.root_path + os.sep+ self.dbfile)
 		self.db = TinyDB(self.root_path + os.sep+ self.dbfile)
 		self.Issue = Query()
 		
@@ -63,18 +66,20 @@ class TFrame(TestingFrame):
 		self.name = " - TTT"
 		self.setTitle("Untitled")
 		
-		self.important = []
-		self.important.append(self.choice_user)
-		self.important.append(self.choice_platform)
-		self.important.append(self.text_ctrl_issue_summary)
-		self.important.append(self.text_ctrl_issue_description)
-		self.important.append(self.text_ctrl_steps_to_reproduce)
-		self.important.append(self.text_ctrl_remediation)
-		self.important.append(self.choice_severity)
-		self.important.append(self.choice_component)
-		self.important.append(self.choice_best_practice)
-		self.important.append(self.choice_wcag)
+		#Fields that are requiree/important
+		self.important = {\
+		TFrame.USER_TYPE: self.choice_user,
+		TFrame.PLATFORM: self.choice_platform,
+		TFrame.ISSUE_SUMMARY: self.text_ctrl_issue_summary,
+		TFrame.ISSUE_DESCRIPTION: self.text_ctrl_issue_description,
+		TFrame.STEPS: self.text_ctrl_steps_to_reproduce,
+		TFrame.REMEDIATTION: self.text_ctrl_remediation,
+		TFrame.SEVERITY: self.choice_severity,
+		TFrame.CATEGORY: self.choice_component,
+		TFrame.BEST_PRACTICE: self.choice_best_practice,
+		TFrame.WCAG: self.choice_wcag}
 		
+		#sample info added to the tree
 		root = self.tree_ctrl_1.AddRoot("All Issues")
 		colorBlind = self.tree_ctrl_1.AppendItem(root,"Color Blind")
 		screenReader = self.tree_ctrl_1.AppendItem(root,"Screen Reader")
@@ -111,6 +116,8 @@ class TFrame(TestingFrame):
 		self.data = TFrame.Data()
 		self.setTitle("Untitled")
 		self.setDirty(False)
+		#clear all selections 
+		#TODO still needs to reset choices
 		for elem in self.important:
 			if type(elem) == type(wx.Choice):
 				elem.SetSelection(0)
@@ -180,6 +187,7 @@ class TFrame(TestingFrame):
 		"""
 		Does the actual work of saving
 		"""
+		#TODO, update to not pickle the data
 		self.setDirty(False)
 		pickle.dump(self.data, file, pickle.HIGHEST_PROTOCOL)
 		
@@ -187,6 +195,7 @@ class TFrame(TestingFrame):
 		"""
 		Called when importing a report. Possibly used by managers (not implemented)
 		"""
+		#TODO, is this neccessary?
 		print("Event handler 'on_menu_import' not implemented!")
 		event.Skip()
 
@@ -194,6 +203,7 @@ class TFrame(TestingFrame):
 		"""
 		Generates a word doc to be used for a PDF output
 		"""
+		#TODO, need to determine the format
 		print("Event handler 'on_menu_export_pdf' not implemented!")
 		event.Skip()
 
@@ -201,6 +211,7 @@ class TFrame(TestingFrame):
 		"""
 		Generates an excel doc of all issues.  possibly used to upload to JIRA
 		"""
+		#TODO, need to determine the format
 		print("Event handler 'on_menu_export_excel' not implemented!")
 		event.Skip()
 
@@ -222,6 +233,7 @@ class TFrame(TestingFrame):
 		"""
 		Used to turn on/off dark mode
 		"""
+		#TODO, need to refine this, so that users can save this setting
 		self.dark = bool(event.Selection)
 		widgets = getWidgets(self)
 		for widget in widgets:
@@ -253,7 +265,7 @@ class TFrame(TestingFrame):
 		event.Skip()
 
 	def on_choice_priority(self, event):  # wxGlade: TestingFrame.<event_handler>
-		self.update_search()
+		#self.update_search()
 		self.setDirty(True)
 		event.Skip()
 
@@ -271,12 +283,8 @@ class TFrame(TestingFrame):
 		self.update_search()
 		self.setDirty(True)
 		#wcag_selection = self.choice_wcag.choices[event.GetSelection()]
-		selection = (self.choice_wcag.GetString(event.GetSelection()))
-		if selection == "All":
-			self.text_ctrl_wcag.SetValue("")
-		results = self.db.search(self.Issue[intake.WCAG] == selection)
-		if len(results):
-			self.text_ctrl_wcag.SetValue(results[0][intake.LINK])
+		self.update_wcag_link()
+		event.Skip()
 			
 	def on_text_issue_summary(self, event):
 		self.setDirty(True)
@@ -287,21 +295,17 @@ class TFrame(TestingFrame):
 		determines if there is unsaved work or if the user is ok with trashing changes
 		"""
 		if self.isDirty:
-			result = (wx.MessageBox("You have unsaved work. Are you sure you want to exit?", "Really exit?", wx.ICON_QUESTION | wx.YES_NO, self) == wx.YES)
-			return result
+			return (wx.MessageBox("You have unsaved work. Are you sure you want to exit?", "Really exit?", wx.ICON_QUESTION | wx.YES_NO, self) == wx.YES)
 		else:
 			return True
 	
 	def on_notebook_page_changed(self, event):  # wxGlade: TestingFrame.<event_handler>
-		if event.GetSelection() == 3:
+		#Data tab
+		if event.GetSelection() == 4:
 			self.text_ctrl_data.ChangeValue(str(self.data.__dict__))
 		elif event.GetSelection() == 1:
-			dd = dict()
-			for k, v in self.search_dict.items():
-				selection = self.get_choice_string(v)
-				if not selection == "All":
-					dd[k] = selection
-			result = self.compound_search(dd)
+			#update teh count box
+			result = self.do_search()
 			count = len(result)
 			self.text_ctrl_count.ChangeValue(str(count))
 			
@@ -313,7 +317,6 @@ class TFrame(TestingFrame):
 		event.Skip()
 		
 	def on_tree_item_activated(self, event):  # wxGlade: TestingFrame.<event_handler>
-		
 		event.Skip()
 
 	def on_tree_sel_changed(self, event):  # wxGlade: TestingFrame.<event_handler>
@@ -323,6 +326,92 @@ class TFrame(TestingFrame):
 			print('dark')
 		event.Skip()
 	
+	def on_button_submit(self, event):  # wxGlade: TestingFrame.<event_handler>
+		#TODO - need to validate there is only one issue, based on filter, and save info to a new database
+		data_to_save = dict()
+		data_to_search = dict()
+		done = True #False if there are empty fields
+		to_finish = [] #array to keep track of unfnished fields
+		for key, item in self.important.items():
+			if type(item) == type(wx.TextCtrl()):
+				data_to_save[key] = item.GetValue()
+				
+			elif type(item) == type(wx.Choice()):
+				data_to_save[key] = self.get_choice_string(item)
+			else:
+				print(key)
+			if data_to_save[key] in ('','All'):
+				done = False
+				to_finish.append(key)
+		#test if ready to submit
+		if not done:
+			#pop alert
+			message = "These fields aren't filled in\n"
+			message += '\n'.join(to_finish)
+			message += '\n\nContinue anyway?'
+			continu = (wx.MessageBox(message, "You Fool!", wx.ICON_QUESTION | wx.CANCEL | wx.CANCEL_DEFAULT, self) == wx.OK)
+			if not continu:
+				return
+			for k in to_finish:
+				print(k)
+		#build the search terms
+		result = self.do_search()
+		for elem in result:
+			print(elem[intake.ISSUE_ID])
+		#add issue to database
+		#TODO
+		#clear the fields on the second tab
+		for field_name, field in self.important.items():
+			if type(field) == type(wx.Choice()):
+				pass
+			elif type(field) == type(wx.TextCtrl()):
+				field.SetValue('')
+		event.Skip()
+		
+	def on_button_edit_issue(self, event):
+		print("TBI - Edit")
+		event.Skip()
+		
+	def on_button_delete_issue(self, event):
+		print("TBI - Delete")
+		event.Skip()
+		
+	def on_cell_select(self, event):
+		print("{} {}".format(event.GetRow(), event.GetCol()))
+		#controller = event.GetEventObject()
+		self.Bind(wx.EVT_KEY_DOWN, self.on_cell_key_down)
+		event.Skip()
+	
+	def on_cell_key_down(self,event):
+		keycode = event.GetKeyCode()
+		#print(keycode)
+		for key in dir(wx.KeyCode):
+			if key == 307: #application key
+				print(key)
+		event.Skip()
+	
+	def do_search(self):
+		'''
+		Performs a search based on the current selection of the wxChoices
+		'''
+		dd = dict()
+		for k, v in self.search_dict.items():
+			selection = self.get_choice_string(v)
+			if not selection == "All":
+				dd[k] = selection
+		return self.compound_search(dd)
+	
+	def update_wcag_link(self):
+		"""
+		Updates the WCAG link field, based on the WCAG criteria choice
+		"""
+		selection = self.get_choice_string(self.choice_wcag)
+		if selection == "All":
+			self.text_ctrl_wcag.SetValue("")
+		results = self.db.search(self.Issue[intake.WCAG] == selection)
+		if len(results):
+			self.text_ctrl_wcag.SetValue(results[0][intake.LINK])
+			
 	def get_column_names(self, column_title):
 		"""
 		Given a key, return all possible values, as a list
@@ -332,6 +421,10 @@ class TFrame(TestingFrame):
 		return user_types
 		
 	def update_search(self):
+		"""
+		Generic function that calculates and updates the choices in a wxChoice
+		Called by all of the wxChoices that can change search results
+		"""
 		for string, choice in self.search_dict.items():
 			selection = choice.GetString(choice.GetSelection())
 			#print(string + ": " + selection)
@@ -358,8 +451,15 @@ class TFrame(TestingFrame):
 				list_to_append.append(item[string])
 			list_to_append = list(set(list_to_append))
 			self.reset_choices(choice,list_to_append)
+		self.update_wcag_link()
+		result = self.do_search()
+		count = len(result)
+		self.text_ctrl_count.ChangeValue(str(count))
 		
 	def get_choice_string(self,choice):
+		"""
+		Given a wxChoice, returns its selected string
+		"""
 		selection_int = choice.GetSelection()
 		return choice.GetString(selection_int)
 
@@ -389,6 +489,10 @@ class TFrame(TestingFrame):
 		return result
 		
 	def reset_choices(self,choice, choices):
+		"""
+		Given a list of choices, and a wxChoice, it sets the choicse to the list
+		and retains the previous selection
+		"""
 		current = self.get_choice_string(choice)
 		choice.Clear()
 		choice.AppendItems(["All"])
@@ -397,19 +501,26 @@ class TFrame(TestingFrame):
 		#print("choices:")
 		#print(choices)
 		choice.AppendItems(choices)
-		#print(choice.choices)
+		''' removed because it can trap the user if two fields are pigeon-holed
+		if len(choices) == 1:
+			sel_int = 1
+		else:
+		'''
 		sel_int = choice.FindString(current)
-		#print(sel_int)
 		choice.SetSelection(sel_int)
 	
 	def load_settings(self):
+		"""
+		Load settings from "settings.txt"
+		# Not working correctly
+		"""
 		settings_file = self.root_path + os.sep + "settings.txt"
 		try:
-			f = open(settings_file, 'wt')
+			f = open(settings_file, 'rt')
 			string = f.read()
 		except IOError:
 			f = open(settings_file, 'wt')
-			string = '{"dark": False, "dbfile":"db.json", "excel_filename":""}'
+			string = '{"dark": False, "dbfile":"db.json"}'
 		finally:
 			if string:
 				try:
@@ -417,10 +528,9 @@ class TFrame(TestingFrame):
 					if not type(settings_handler) == type(dict()):
 						raise KeyError
 				except:
-					settings_handler = {'dark': False, "dbfile":"db.json", "excel_filename":""}
+					settings_handler = {'dark': False, "dbfile":"db.json"}
 			else:
-				settings_handler = {'dark': False, "dbfile":"db.json", "excel_filename":""}
-				
+				settings_handler = {'dark': False, "dbfile":"db.json"}
 			#dark
 			try:
 				self.settings['dark'] = settings_handler['dark']
@@ -432,28 +542,14 @@ class TFrame(TestingFrame):
 			except KeyError:
 				self.dbfile = "db.json"
 			
-			#excel source
-			try:
-				self.excel_filename = settings_handler['excel_filename']
-				if self.excel_filename == "":
-					raise KeyError
-			except KeyError:
-				with wx.FileDialog(self, message="Select an Excel file of the Issue table",	wildcard="Excel  Files (*.xlsx)|*.xlsx", style=wx.FD_OPEN |wx.FD_FILE_MUST_EXIST) as dlg:
-					if dlg.ShowModal() == wx.ID_OK:
-						filename = dlg.GetPath()
-						if filename:
-							self.excel_filename = (filename.split(os.sep))[-1]
-					else:
-						print("No file selected")
-			string = str({'dark': self.dark, 'dbfile': self.dbfile, 'excel_filename':self.excel_filename})
+			#save the settings for next time
+			string = str({'dark': self.dark, 'dbfile': self.dbfile})
+			if not 'w' in f.mode:
+				f.close()
+				f = open(settings_file, 'wt')
 			f.write(string)
 			f.close()
 		
-def remove_key(dd, key):
-	r = dict(dd)
-	del r[key]
-	return r
-
 def get_name_from_file(file):
 	"""
 	Given a full file path C:/one/foo.rpt returns foo
