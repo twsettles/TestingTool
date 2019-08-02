@@ -6,7 +6,6 @@ class IssueDatabase(TinyDB):
 	def _init__(self,*args, **kwds):
 		print("wrapper")
 		TinyDB.__init__(self,*args, **kwds)
-		self.Issue = Query()
 	
 	def compound_search(self, dd: Dict):
 		"""
