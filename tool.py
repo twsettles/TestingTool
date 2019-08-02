@@ -1,7 +1,8 @@
 from testing_GUI import TestingFrame
 import intake
+from database import IssueDatabase
 import wx, pickle, gettext, json, os
-from tinydb import TinyDB, Query, where
+from tinydb import Query, where
 
 COLOR ={"light":{"fg":"#000000", 'bg':'#ffffff'}, \
 		'dark':{"fg":"#ffffff", 'bg':'#080808'}}
@@ -17,15 +18,6 @@ class TFrame(TestingFrame):
 	CATEGORY = intake.CATEGORY
 	BEST_PRACTICE = intake.BEST_PRACTICE
 	WCAG = intake.WCAG
-	
-	class Data():
-		"""
-		Used to be able to save data to/from a file
-		"""
-		def __init__(self):
-			self.pathname = ''
-			self.issue_summary = ''
-			self.user = ''
 	
 	def __init__(self, *args, **kwds):
 		import glob
@@ -50,7 +42,7 @@ class TFrame(TestingFrame):
 		intake.WCAG: self.choice_wcag}
 		
 		for label, choice in self.search_dict.items():
-			list_items = self.get_column_names(label)
+			list_items = self.db.get_column_names(label)
 			list_items.sort()
 			choice.AppendItems(list_items)
 		
@@ -63,7 +55,6 @@ class TFrame(TestingFrame):
 		self.choices.append(self.choice_wcag)
 			
 		self.isDirty = False #used to save the state of changes
-		self.data = TFrame.Data()
 		self.name = " - TTT"
 		self.setTitle("Untitled")
 		
@@ -400,7 +391,7 @@ class TFrame(TestingFrame):
 			selection = self.get_choice_string(v)
 			if not selection == "All":
 				dd[k] = selection
-		return self.compound_search(dd)
+		return self.db.compound_search(dd)
 	
 	def update_wcag_link(self):
 		"""
@@ -412,14 +403,6 @@ class TFrame(TestingFrame):
 		results = self.db.search(self.Issue[intake.WCAG] == selection)
 		if len(results):
 			self.text_ctrl_wcag.SetValue(results[0][intake.LINK])
-			
-	def get_column_names(self, column_title):
-		"""
-		Given a key, return all possible values, as a list
-		"""
-		result = self.db.search(self.Issue)
-		user_types = list(set([item[column_title] for item in result[1:]]))
-		return user_types
 		
 	def update_search(self):
 		"""
@@ -442,7 +425,7 @@ class TFrame(TestingFrame):
 				except KeyError:
 					pass
 			#print("copy string dict:\t"+str(copy_string_dict))
-			results = self.compound_search(copy_string_dict)
+			results = self.db.compound_search(copy_string_dict)
 			#print("len(results):\t"+str(len(results)))
 			list_to_append = []
 			#print("results[0]:\t" + str(results[0]))
@@ -463,31 +446,6 @@ class TFrame(TestingFrame):
 		"""
 		selection_int = choice.GetSelection()
 		return choice.GetString(selection_int)
-
-	def compound_search(self, dd):
-		"""
-		given a dictionary of search terms, returns a list of the results
-		"""
-		result = []
-		to_delete = []
-		for k,v in dd.items():
-			if (v == "") or (v =="ALL"):
-				to_delete.append(k)
-		for key in to_delete:
-			try:			
-				del dd[key]
-			except KeyError:
-				pass
-		#print("Filtering based on:\t" + str(dd))
-		if dd:
-			search_list = []
-			for k,v in dd.items():
-				search_list.append("(self.Issue."+k+" == '"+v+"')")
-			code = "self.db.search("+'&'.join(search_list)+")"
-			result = eval(code)
-		else:
-			result = self.db.search(self.Issue)
-		return result
 		
 	def reset_choices(self,choice, choices):
 		"""
@@ -499,8 +457,6 @@ class TFrame(TestingFrame):
 		choice.AppendItems(["All"])
 		choices = list(set(choices))
 		choices.sort()
-		#print("choices:")
-		#print(choices)
 		choice.AppendItems(choices)
 		''' removed because it can trap the user if two fields are pigeon-holed
 		if len(choices) == 1:
@@ -512,15 +468,13 @@ class TFrame(TestingFrame):
 	
 	def load_db(self):
 		try:
-			self.db = TinyDB('db.json')
+			self.db = IssueDatabase('db.json')
 		except:
 			try:
 				path = self.get_file_path("Open the issues database file", 'json')
-				self.db = TinyDB(path)
+				self.db = IssueDatabase(path)
 			except:
 				print("everything broke")
-			
-			
 	
 	def load_settings(self): #TODO
 		"""
