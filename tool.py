@@ -2,7 +2,7 @@ from testing_GUI import TestingFrame
 import intake
 from database import IssueDatabase
 import wx, pickle, gettext, json, os
-from tinydb import Query, where
+from tinydb import Query
 
 COLOR ={"light":{"fg":"#000000", 'bg':'#ffffff'}, \
 		'dark':{"fg":"#ffffff", 'bg':'#080808'}}
@@ -30,9 +30,7 @@ class TFrame(TestingFrame):
 		self.dbfile = ''
 		self.db = None
 		self.load_db()
-		
-		#self.load_settings()
-		self.Issue = Query()
+		self.Issue = Query() #TODO remove this and the errors taht causes
 		
 		self.search_dict = \
 		{intake.USER_TYPE: self.choice_user,
@@ -394,15 +392,8 @@ class TFrame(TestingFrame):
 		return self.db.compound_search(dd)
 	
 	def update_wcag_link(self):
-		"""
-		Updates the WCAG link field, based on the WCAG criteria choice
-		"""
-		selection = self.get_choice_string(self.choice_wcag)
-		if selection == "All":
-			self.text_ctrl_wcag.SetValue("")
-		results = self.db.search(self.Issue[intake.WCAG] == selection)
-		if len(results):
-			self.text_ctrl_wcag.SetValue(results[0][intake.LINK])
+		link = self.db.get_wcag_link(self.get_choice_string(self.choice_wcag))
+		self.text_ctrl_wcag.SetValue(link)
 		
 	def update_search(self):
 		"""

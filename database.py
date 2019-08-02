@@ -1,10 +1,9 @@
-import wx
+import wx, intake
 from typing import *
 from tinydb import TinyDB, Query, where
 
 class IssueDatabase(TinyDB):
-	def _init__(self,*args, **kwds):
-		print("wrapper")
+	def __init__(self,*args, **kwds):
 		TinyDB.__init__(self,*args, **kwds)
 	
 	def compound_search(self, dd: Dict):
@@ -43,3 +42,15 @@ class IssueDatabase(TinyDB):
 	
 	def empty_search(self):
 		return self.search(Query().IssueID.test(lambda x: True))
+		
+	def get_wcag_link(self, selection: str):
+		"""
+		Updates the WCAG link field, based on the WCAG criteria choice
+		"""
+		if selection == "All":
+			return ''
+		results = self.search(where(intake.WCAG) == selection)
+		if len(results):
+			return results[0][intake.LINK]
+		else:
+			return ''
