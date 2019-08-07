@@ -1,6 +1,7 @@
 import glob
 import os
 from tinydb import TinyDB, Query
+from typing import List
 
 ISSUE_ID = "IssueID"
 USER_TYPE = "UserType"
@@ -16,7 +17,7 @@ def read_xlsx(file):
 	#print((file))
 	import xlrd
 	book = xlrd.open_workbook(file)
-	data = []
+	data = [] #type: List[List]
 	for i in range(book.nsheets):
 		sheet = book.sheet_by_index(i)
 		data.append([])
@@ -31,7 +32,7 @@ def read_xlsx(file):
 			data[i].append(r)
 	return data
 	
-def build_db(issues, pathname):
+def build_db(issues, pathname: str) -> None:
 	with TinyDB(pathname) as db:
 		if not len(db) > 1:
 			for i, issue in enumerate(issues):
@@ -50,7 +51,7 @@ if __name__ == "__main__":
 
 	uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
 	files = glob.glob(uppath(__file__, 1) + os.sep + "*.xlsx")
-	issues = []
+	issues:List = []
 	for file in files[1:]:
 		print(file)
 		data = read_xlsx(file)
