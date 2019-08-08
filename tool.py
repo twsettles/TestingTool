@@ -1,7 +1,8 @@
 from testing_GUI import TestingFrame
 import intake
 from database import IssueDatabase
-import wx, pickle, gettext, json, os
+from issue_list import IssueList
+import wx, gettext, json, os
 from tinydb import Query
 
 COLOR ={"light":{"fg":"#000000", 'bg':'#ffffff'}, \
@@ -18,6 +19,8 @@ class TFrame(TestingFrame):
 	CATEGORY = intake.CATEGORY
 	BEST_PRACTICE = intake.BEST_PRACTICE
 	WCAG = intake.WCAG
+	JSON_WC = "JSON Files (*.json)|*.json|All Files (*.*)|*.*"
+	RPT_WC = "RPT Files (*.rpt)|*.rpt|All Files (*.*)|*.*"
 	
 	def __init__(self, *args, **kwds):
 		import glob
@@ -31,6 +34,7 @@ class TFrame(TestingFrame):
 		self.db = None
 		self.load_db()
 		self.Issue = Query() #TODO remove this and the errors taht causes
+		self.issue_l = IssueList()
 		
 		self.search_dict = \
 		{intake.USER_TYPE: self.choice_user,
@@ -43,18 +47,11 @@ class TFrame(TestingFrame):
 			list_items = self.db.get_column_names(label)
 			list_items.sort()
 			choice.AppendItems(list_items)
-		
-		self.choices = []
-		self.choices.append(self.choice_platform)
-		self.choices.append(self.choice_user)
-		self.choices.append(self.choice_severity)
-		self.choices.append(self.choice_component)
-		self.choices.append(self.choice_best_practice)
-		self.choices.append(self.choice_wcag)
 			
-		self.isDirty = False #used to save the state of changes
+		self.isDirty: bool = False #used to save the state of changes
 		self.name = " - TTT"
 		self.setTitle("Untitled")
+		self.pathname:str = ''
 		
 		#Fields that are requiree/important
 		self.important = {\
@@ -70,11 +67,7 @@ class TFrame(TestingFrame):
 		TFrame.WCAG: self.choice_wcag}
 		
 		#sample info added to the tree
-		root = self.tree_ctrl_1.AddRoot("All Issues")
-		colorBlind = self.tree_ctrl_1.AppendItem(root,"Color Blind")
-		screenReader = self.tree_ctrl_1.AppendItem(root,"Screen Reader")
-		contrast = self.tree_ctrl_1.AppendItem(colorBlind,"Improve Contrast")
-		labels = self.tree_ctrl_1.AppendItem(screenReader,"Add Labels")
+		self.root = self.tree_ctrl_1.AddRoot("All Issues")
 
 	def setDirty(self, isDirty):
 		"""
@@ -103,7 +96,7 @@ class TFrame(TestingFrame):
 		"""
 		if not self.safeToQuit():
 			return
-		self.data = TFrame.Data()
+		self.issue_l = IssueList()
 		self.setTitle("Untitled")
 		self.setDirty(False)
 		#clear all selections 
@@ -122,18 +115,17 @@ class TFrame(TestingFrame):
 			return
 		
 		filename = ''
-		with wx.FileDialog(self, message="Open a file",	wildcard="RPT  Files (*.rpt)|*.rpt", style=wx.FD_OPEN |wx.FD_FILE_MUST_EXIST) as dlg:
+		with wx.FileDialog(self, message="Open a file",	wildcard=TFrame.RPT_WC, style=wx.FD_OPEN |wx.FD_FILE_MUST_EXIST) as dlg:
 		
 			if dlg.ShowModal() == wx.ID_OK:
 				filename = dlg.GetPath()
 			
 			if filename:
-				with open(filename,'rb') as f:
-					self.data = pickle.load(f)
+				self.pathname = filename
+				with open(filename,'r') as f:
+					self.issue_l.read_issues(f)
 					f.close()
-					self.text_ctrl_data.ChangeValue(str(self.data.__dict__))
-					self.text_ctrl_issue_summary.SetValue(self.data.issue_summary)
-					self.choice_user.SetSelection(self.data.user)
+					self.text_ctrl_data.ChangeValue(str(self.issue_l))
 					self.setTitle(get_name_from_file(filename))
 				self.setDirty(False)
 			else:
@@ -143,16 +135,17 @@ class TFrame(TestingFrame):
 		"""
 		Called on file>save or ctrl+s
 		"""
-		if self.data.pathname == "":
+		#TODO: broken because of self.data
+		if self.pathname == "":
 			self.on_menu_save_as(event)
 		else:
-			self.save_as(self.data.pathname)
+			self.save_as(self.pathname)
 	
 	def on_menu_save_as(self, event):
 		"""
 		Called on file>save_as or ctrl+shift+s
 		"""
-		with wx.FileDialog(self, "Save RPT file", wildcard="RPT files (*.rpt)|*.rpt", style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
+		with wx.FileDialog(self, "Save RPT file", wildcard=TFrame.RPT_WC, style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
 			if fileDialog.ShowModal() == wx.ID_CANCEL:
 				return     # the user changed their mind
 
@@ -164,11 +157,9 @@ class TFrame(TestingFrame):
 		"""
 		does the work for both on_menu_save_as and on_menu_save
 		"""
-		with open(pathname, 'wb') as file:
+		with open(pathname, 'w') as file:
 			self.setTitle(get_name_from_file(pathname))
-			self.data.pathname = pathname
-			self.data.issue_summary = self.text_ctrl_issue_summary.GetValue()
-			self.data.user = self.choice_user.GetSelection()
+			self.pathname = pathname
 			
 			self.doSaveData(file)
 			file.close()
@@ -179,7 +170,7 @@ class TFrame(TestingFrame):
 		"""
 		#TODO, update to not pickle the data
 		self.setDirty(False)
-		pickle.dump(self.data, file, pickle.HIGHEST_PROTOCOL)
+		self.issue_l.write_issues(file)
 		
 	def on_menu_import(self, event):  # wxGlade: TestingFrame.<event_handler>
 		"""
@@ -285,19 +276,34 @@ class TFrame(TestingFrame):
 		determines if there is unsaved work or if the user is ok with trashing changes
 		"""
 		if self.isDirty:
-			return (wx.MessageBox("You have unsaved work. Are you sure you want to exit?", "Really exit?", wx.ICON_QUESTION | wx.YES_NO, self) == wx.YES)
+			return (wx.MessageBox("You have unsaved work. Are you sure you want to continue?", "Are you sure?", wx.ICON_QUESTION | wx.YES_NO, self) == wx.YES)
 		else:
 			return True
 	
 	def on_notebook_page_changed(self, event):  # wxGlade: TestingFrame.<event_handler>
-		#Data tab
-		if event.GetSelection() == 4:
-			self.text_ctrl_data.ChangeValue(str(self.data.__dict__))
-		elif event.GetSelection() == 1:
-			#update teh count box
+		if event.GetSelection() == 4: # raw data tab
+			to_place:str = ''
+			for item in self.issue_l:
+				to_place += str(item) + '\n'
+			self.text_ctrl_data.ChangeValue(to_place)
+		elif event.GetSelection() == 3: # table tab
+			self.grid_1.ClearGrid()
+			for i, item in enumerate(self.issue_l):
+				summ = item[TFrame.ISSUE_SUMMARY]
+				sev = item[TFrame.SEVERITY]
+				self.grid_1.SetCellValue(i,0, summ)
+				self.grid_1.SetCellValue(i,1, sev)
+		elif event.GetSelection() == 1: # per issue tab
+			#update the count box
 			result = self.do_search()
 			count = len(result)
 			self.text_ctrl_count.ChangeValue(str(count))
+		elif event.GetSelection() == 2: # tree Issue tab
+			self.tree_ctrl_1.DeleteChildren(self.root)
+			children:List = []
+			for i, item in enumerate(self.issue_l):
+				summ = item[TFrame.ISSUE_SUMMARY]
+				children.append(self.tree_ctrl_1.AppendItem(self.root, summ))
 			
 	def on_tree_key_down(self, event):  # wxGlade: TestingFrame.<event_handler>
 		if event.GetKeyCode() == 395: #Applications key
@@ -349,17 +355,17 @@ class TFrame(TestingFrame):
 		for elem in result:
 			print(elem[intake.ISSUE_ID])
 		#add issue to database
-		#TODO
+		self.issue_l.add_issue(data_to_save)
 		#clear the fields on the second tab
-		for field_name, field in self.important.items():
+		for field in getWidgets(self.notebook_1_pane_3):
 			if type(field) == type(wx.Choice()):
-				pass
+				field.SetSelection(0)
 			elif type(field) == type(wx.TextCtrl()):
 				field.SetValue('')
 		event.Skip()
 		
 	def on_button_edit_issue(self, event):
-		print("TBI - Edit")
+		print(self.tree_ctrl_1.GetFocusedItem())
 		event.Skip()
 		
 	def on_button_delete_issue(self, event):

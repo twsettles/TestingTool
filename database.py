@@ -1,17 +1,17 @@
 import wx, intake
-from typing import *
+from typing import Dict, List
 from tinydb import TinyDB, Query, where
 
 class IssueDatabase(TinyDB):
 	def __init__(self,*args, **kwds):
 		TinyDB.__init__(self,*args, **kwds)
 	
-	def compound_search(self, dd: Dict):
+	def compound_search(self, dd: Dict[str, str]) -> List:
 		"""
 		given a dictionary of search terms, returns a list of the results
 		"""
-		result = []
-		to_delete = []
+		result = [] #type: List
+		to_delete = [] #type: List
 		#remove "All" from the search results
 		for k,v in dd.items():
 			if (v == "") or (v =="ALL"):
