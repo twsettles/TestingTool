@@ -4,6 +4,7 @@ from database import IssueDatabase
 from issue_list import IssueList
 import wx, gettext, json, os
 from tinydb import Query
+from typing import Optional
 
 COLOR ={"light":{"fg":"#000000", 'bg':'#ffffff'}, \
 		'dark':{"fg":"#ffffff", 'bg':'#080808'}}
@@ -192,8 +193,26 @@ class TFrame(TestingFrame):
 		"""
 		Generates an excel doc of all issues.  possibly used to upload to JIRA
 		"""
-		#TODO, need to determine the format
-		print("Event handler 'on_menu_export_excel' not implemented!")
+		import export
+		order_of_keys: List = [\
+		TFrame.PLATFORM,
+		TFrame.USER_TYPE,
+		TFrame.ISSUE_SUMMARY,
+		TFrame.ISSUE_DESCRIPTION,
+		TFrame.STEPS,
+		TFrame.REMEDIATTION,
+		TFrame.SEVERITY,
+		TFrame.CATEGORY,
+		TFrame.BEST_PRACTICE,
+		TFrame.WCAG]
+		
+		tbw: List = [] #to be written
+		tbw.append(order_of_keys)
+		for entry in self.issue_l:
+			tbw.append(export.dict_to_list(order_of_keys,entry))
+		p_name = r'C:\Users\p2763554\Documents\GitHub\TestingTool\excl.xls'
+		p_name = self.get_file_path("Select file to save to", 'xls', True)
+		export.generate(p_name, tbw)
 		event.Skip()
 
 	def on_menu_exit(self, event):  # wxGlade: TestingFrame.<event_handler>
@@ -515,9 +534,13 @@ class TFrame(TestingFrame):
 			f.write(string)
 			f.close()
 
-	def get_file_path(self, mess: str, ext: str):
+	def get_file_path(self, mess: str, ext: str, create: Optional[bool] = False):
 		wc_str = ext.upper() + ' Files (*.' + ext + ')|*.' + ext
-		with wx.FileDialog(self, message = mess, wildcard=wc_str, style=wx.FD_OPEN |wx.FD_FILE_MUST_EXIST) as dlg:
+		if create:
+			stl = wx.FD_OPEN
+		else:
+			stl = wx.FD_OPEN |wx.FD_FILE_MUST_EXIST
+		with wx.FileDialog(self, message = mess, wildcard=wc_str, style=stl) as dlg:
 				if dlg.ShowModal() == wx.ID_OK:
 					return dlg.GetPath()
 				return "Nah"
