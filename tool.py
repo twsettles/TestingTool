@@ -2,7 +2,7 @@ from testing_GUI import TestingFrame
 import intake
 from database import IssueDatabase
 from issue_list import IssueList
-import wx, pickle, gettext, json, os
+import wx, gettext, json, os
 from tinydb import Query
 
 COLOR ={"light":{"fg":"#000000", 'bg':'#ffffff'}, \
@@ -19,6 +19,8 @@ class TFrame(TestingFrame):
 	CATEGORY = intake.CATEGORY
 	BEST_PRACTICE = intake.BEST_PRACTICE
 	WCAG = intake.WCAG
+	JSON_WC = "JSON Files (*.json)|*.json|All Files (*.*)|*.*"
+	RPT_WC = "RPT Files (*.rpt)|*.rpt|All Files (*.*)|*.*"
 	
 	def __init__(self, *args, **kwds):
 		import glob
@@ -45,16 +47,8 @@ class TFrame(TestingFrame):
 			list_items = self.db.get_column_names(label)
 			list_items.sort()
 			choice.AppendItems(list_items)
-		
-		self.choices = []
-		self.choices.append(self.choice_platform)
-		self.choices.append(self.choice_user)
-		self.choices.append(self.choice_severity)
-		self.choices.append(self.choice_component)
-		self.choices.append(self.choice_best_practice)
-		self.choices.append(self.choice_wcag)
 			
-		self.isDirty = False #used to save the state of changes
+		self.isDirty: bool = False #used to save the state of changes
 		self.name = " - TTT"
 		self.setTitle("Untitled")
 		self.pathname:str = ''
@@ -73,11 +67,7 @@ class TFrame(TestingFrame):
 		TFrame.WCAG: self.choice_wcag}
 		
 		#sample info added to the tree
-		root = self.tree_ctrl_1.AddRoot("All Issues")
-		colorBlind = self.tree_ctrl_1.AppendItem(root,"Color Blind")
-		screenReader = self.tree_ctrl_1.AppendItem(root,"Screen Reader")
-		contrast = self.tree_ctrl_1.AppendItem(colorBlind,"Improve Contrast")
-		labels = self.tree_ctrl_1.AppendItem(screenReader,"Add Labels")
+		self.root = self.tree_ctrl_1.AddRoot("All Issues")
 
 	def setDirty(self, isDirty):
 		"""
@@ -125,7 +115,7 @@ class TFrame(TestingFrame):
 			return
 		
 		filename = ''
-		with wx.FileDialog(self, message="Open a file",	wildcard="JSON Files (*.json)|*.json", style=wx.FD_OPEN |wx.FD_FILE_MUST_EXIST) as dlg:
+		with wx.FileDialog(self, message="Open a file",	wildcard=TFrame.RPT_WC, style=wx.FD_OPEN |wx.FD_FILE_MUST_EXIST) as dlg:
 		
 			if dlg.ShowModal() == wx.ID_OK:
 				filename = dlg.GetPath()
@@ -155,7 +145,7 @@ class TFrame(TestingFrame):
 		"""
 		Called on file>save_as or ctrl+shift+s
 		"""
-		with wx.FileDialog(self, "Save JSON file", wildcard="JSON files (*.json)|*.json", style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
+		with wx.FileDialog(self, "Save RPT file", wildcard=TFrame.RPT_WC, style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
 			if fileDialog.ShowModal() == wx.ID_CANCEL:
 				return     # the user changed their mind
 
@@ -286,17 +276,15 @@ class TFrame(TestingFrame):
 		determines if there is unsaved work or if the user is ok with trashing changes
 		"""
 		if self.isDirty:
-			return (wx.MessageBox("You have unsaved work. Are you sure you want to exit?", "Really exit?", wx.ICON_QUESTION | wx.YES_NO, self) == wx.YES)
+			return (wx.MessageBox("You have unsaved work. Are you sure you want to continue?", "Are you sure?", wx.ICON_QUESTION | wx.YES_NO, self) == wx.YES)
 		else:
 			return True
 	
 	def on_notebook_page_changed(self, event):  # wxGlade: TestingFrame.<event_handler>
-		#Data tab
 		if event.GetSelection() == 4: # raw data tab
 			to_place:str = ''
 			for item in self.issue_l:
-				to_place += str(item) + '\n\r'
-				print("blab")
+				to_place += str(item) + '\n'
 			self.text_ctrl_data.ChangeValue(to_place)
 		elif event.GetSelection() == 3: # table tab
 			self.grid_1.ClearGrid()
@@ -306,10 +294,16 @@ class TFrame(TestingFrame):
 				self.grid_1.SetCellValue(i,0, summ)
 				self.grid_1.SetCellValue(i,1, sev)
 		elif event.GetSelection() == 1: # per issue tab
-			#update teh count box
+			#update the count box
 			result = self.do_search()
 			count = len(result)
 			self.text_ctrl_count.ChangeValue(str(count))
+		elif event.GetSelection() == 2: # tree Issue tab
+			self.tree_ctrl_1.DeleteChildren(self.root)
+			children:List = []
+			for i, item in enumerate(self.issue_l):
+				summ = item[TFrame.ISSUE_SUMMARY]
+				children.append(self.tree_ctrl_1.AppendItem(self.root, summ))
 			
 	def on_tree_key_down(self, event):  # wxGlade: TestingFrame.<event_handler>
 		if event.GetKeyCode() == 395: #Applications key
@@ -363,7 +357,7 @@ class TFrame(TestingFrame):
 		#add issue to database
 		self.issue_l.add_issue(data_to_save)
 		#clear the fields on the second tab
-		for field_name, field in self.important.items():
+		for field in getWidgets(self.notebook_1_pane_3):
 			if type(field) == type(wx.Choice()):
 				field.SetSelection(0)
 			elif type(field) == type(wx.TextCtrl()):
@@ -371,7 +365,7 @@ class TFrame(TestingFrame):
 		event.Skip()
 		
 	def on_button_edit_issue(self, event):
-		print("TBI - Edit")
+		print(self.tree_ctrl_1.GetFocusedItem())
 		event.Skip()
 		
 	def on_button_delete_issue(self, event):
