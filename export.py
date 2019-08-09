@@ -30,7 +30,10 @@ def dict_to_list(keys: List, d: Dict) -> List:
 	'''
 	retval: List = []
 	for key in keys:
-		retval.append(d[key])
+		try:
+			retval.append(d[key])
+		except KeyError:
+			retval.append('')
 	return retval
 
 if __name__ == "__main__":

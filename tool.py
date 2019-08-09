@@ -30,15 +30,14 @@ class TFrame(TestingFrame):
 		self.settings = {}
 		self.dark = False
 		
-		self.settings_file = 'settings.txt'
 		self.dbfile = ''
 		self.db = None
 		self.load_db()
 		self.Issue = Query() #TODO remove this and the errors taht causes
 		self.issue_l = IssueList()
 		
-		self.search_dict = \
-		{intake.USER_TYPE: self.choice_user,
+		self.search_dict = {
+		intake.USER_TYPE: self.choice_user,
 		intake.CATEGORY: self.choice_component,
 		intake.BEST_PRACTICE: self.choice_best_practice,
 		intake.PLATFORM: self.choice_platform,
@@ -59,10 +58,10 @@ class TFrame(TestingFrame):
 		TFrame.USER_TYPE: self.choice_user,
 		TFrame.PLATFORM: self.choice_platform,
 		TFrame.ISSUE_SUMMARY: self.text_ctrl_issue_summary,
-		TFrame.ISSUE_DESCRIPTION: self.text_ctrl_issue_description,
 		TFrame.STEPS: self.text_ctrl_steps_to_reproduce,
-		TFrame.REMEDIATTION: self.text_ctrl_remediation,
+		TFrame.ISSUE_DESCRIPTION: self.text_ctrl_issue_description,
 		TFrame.SEVERITY: self.choice_severity,
+		TFrame.REMEDIATTION: self.text_ctrl_remediation,
 		TFrame.CATEGORY: self.choice_component,
 		TFrame.BEST_PRACTICE: self.choice_best_practice,
 		TFrame.WCAG: self.choice_wcag}
@@ -574,6 +573,5 @@ class MyApp(wx.App):
 		return True
 
 if __name__ == "__main__":
-	gettext.install("app") # replace with the appropriate catalog name
 	app = MyApp(0)
 	app.MainLoop()
