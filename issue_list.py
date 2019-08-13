@@ -45,22 +45,27 @@ class IssueList(Iterable):
 					return item[IssueList.NUM]
 			except KeyError:
 				continue
-		
+	
+	def update_issue(self, num: int, new: Dict[str,str]) -> None:
+		for key, value in new.items():
+			try:
+				self.l[num][key] = value
+			except KeyError:
+				pass
+			
 	def write_issues(self, fp: IO[str]) -> None:
-		json.dump(self.l,fp)
+		json.dump(self.__dict__,fp)
 	
 	def read_issues(self, fp: IO[str]) -> None:
-		self.l = json.load(fp)
+		self.__dict__.update(**(json.load(fp)))
 	
 def main() -> None:
 	issue = IssueList()
-	f = open(r'C:\Users\p2763554\Documents\GitHub\TestingTool\test.json')
-	#issue.read_issues(f)
-	issue.add_issue({'foo':'bar'})
-	issue.add_issue({'spam':'eggs'})
-	issue.add_issue({'a':'b'})
-	issue.add_issue({'bacon':'cheese'})
-	i = issue.find(('a','b'))
+	issue.add_issue({'Name':'Alice', 'Age': '5'})
+	issue.add_issue({'Name':'Bob', 'Age':'3'})
+	issue.add_issue({'Name':'Charlie', 'Age': '7'})
+	issue.add_issue({'Name':'Dennis', 'Age': '6'})
+	i = issue.find(('Name', 'Bob'))
 	issue.remove_issue(i)
 	issue.write_issues(sys.stdout)
 	print('')

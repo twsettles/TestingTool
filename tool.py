@@ -35,6 +35,7 @@ class TFrame(TestingFrame):
 		self.load_db()
 		self.Issue = Query() #TODO remove this and the errors taht causes
 		self.issue_l = IssueList()
+		self.current_issue_id = -1 #used for editing issues
 		
 		self.search_dict = {
 		intake.USER_TYPE: self.choice_user,
@@ -68,6 +69,7 @@ class TFrame(TestingFrame):
 		
 		#sample info added to the tree
 		self.root = self.tree_ctrl_1.AddRoot("All Issues")
+		self.tree_issues: Dict = dict()
 
 	def setDirty(self, isDirty):
 		"""
@@ -100,13 +102,8 @@ class TFrame(TestingFrame):
 		self.setTitle("Untitled")
 		self.setDirty(False)
 		#clear all selections 
-		#TODO still needs to reset choices
-		for elem in self.important:
-			if type(elem) == type(wx.Choice):
-				elem.SetSelection(0)
-			elif type(elem) == type(wx.TextCtrl):
-				elem.SetValue('')
-
+		self.clear_input()
+		
 	def on_menu_open(self, event):
 		"""
 		Called on file>open or ctrl+o
@@ -168,7 +165,6 @@ class TFrame(TestingFrame):
 		"""
 		Does the actual work of saving
 		"""
-		#TODO, update to not pickle the data
 		self.setDirty(False)
 		self.issue_l.write_issues(file)
 		
@@ -205,7 +201,7 @@ class TFrame(TestingFrame):
 		TFrame.BEST_PRACTICE,
 		TFrame.WCAG]
 		
-		tbw: List = [] #to be written
+		tbw: List[List] = [] #to be written
 		tbw.append(order_of_keys)
 		for entry in self.issue_l:
 			tbw.append(export.dict_to_list(order_of_keys,entry))
@@ -300,45 +296,39 @@ class TFrame(TestingFrame):
 	
 	def on_notebook_page_changed(self, event):  # wxGlade: TestingFrame.<event_handler>
 		if event.GetSelection() == 4: # raw data tab
-			to_place:str = ''
-			for item in self.issue_l:
-				to_place += str(item) + '\n'
-			self.text_ctrl_data.ChangeValue(to_place)
+			self.raw_data_tab_selected(event)
 		elif event.GetSelection() == 3: # table tab
-			self.grid_1.ClearGrid()
-			for i, item in enumerate(self.issue_l):
-				summ = item[TFrame.ISSUE_SUMMARY]
-				sev = item[TFrame.SEVERITY]
-				self.grid_1.SetCellValue(i,0, summ)
-				self.grid_1.SetCellValue(i,1, sev)
+			self.table_tab_selected(event)
 		elif event.GetSelection() == 1: # per issue tab
-			#update the count box
-			result = self.do_search()
-			count = len(result)
-			self.text_ctrl_count.ChangeValue(str(count))
+			self.create_issue_tab_selected(event)
 		elif event.GetSelection() == 2: # tree Issue tab
-			self.tree_ctrl_1.DeleteChildren(self.root)
-			children:List = []
-			for i, item in enumerate(self.issue_l):
-				summ = item[TFrame.ISSUE_SUMMARY]
-				children.append(self.tree_ctrl_1.AppendItem(self.root, summ))
-			
-	def on_tree_key_down(self, event):  # wxGlade: TestingFrame.<event_handler>
-		if event.GetKeyCode() == 395: #Applications key
-			for func in dir(event):
-				print(func)
-			print(event.GetSelection())
-		event.Skip()
+			self.tree_tab_selected(event)
+	
+	def raw_data_tab_selected(self, event):
+		to_place:str = ''
+		for item in self.issue_l:
+			to_place += str(item) + '\n'
+		self.text_ctrl_data.ChangeValue(to_place)
 		
-	def on_tree_item_activated(self, event):  # wxGlade: TestingFrame.<event_handler>
-		event.Skip()
-
-	def on_tree_sel_changed(self, event):  # wxGlade: TestingFrame.<event_handler>
-		id = self.tree_ctrl_1.GetFocusedItem()
-		if self.dark:
-			print(self.tree_ctrl_1.SetItemBackgroundColour(id, COLOR['dark']['fg']))
-			print('dark')
-		event.Skip()
+	def table_tab_selected(self, event):
+		self.grid_1.ClearGrid()
+		for i, item in enumerate(self.issue_l):
+			summ = item[TFrame.ISSUE_SUMMARY]
+			sev = item[TFrame.SEVERITY]
+			self.grid_1.SetCellValue(i,0, summ)
+			self.grid_1.SetCellValue(i,1, sev)
+			
+	def create_issue_tab_selected(self, event):
+		#update the count box
+		result = self.do_search()
+		count = len(result)
+		self.text_ctrl_count.ChangeValue(str(count))
+	
+	def tree_tab_selected(self, event):
+		self.tree_ctrl_1.DeleteChildren(self.root)
+		for i, item in enumerate(self.issue_l):
+			summ = item[TFrame.ISSUE_SUMMARY]
+			self.tree_issues[self.tree_ctrl_1.AppendItem(self.root, summ)] = item[IssueList.NUM]
 	
 	def on_button_submit(self, event):  # wxGlade: TestingFrame.<event_handler>
 		#TODO - need to validate there is only one issue, based on filter, and save info to a new database
@@ -373,35 +363,39 @@ class TFrame(TestingFrame):
 		for elem in result:
 			print(elem[intake.ISSUE_ID])
 		#add issue to database
-		self.issue_l.add_issue(data_to_save)
+		if self.current_issue_id == -1:
+			self.issue_l.add_issue(data_to_save)
+		else:
+			self.issue_l.update_issue(self.current_issue_id, data_to_save)
+			self.current_issue_id = -1
 		#clear the fields on the second tab
 		for field in getWidgets(self.notebook_1_pane_3):
-			if type(field) == type(wx.Choice()):
-				field.SetSelection(0)
-			elif type(field) == type(wx.TextCtrl()):
-				field.SetValue('')
+			self.clear_input(field)
+		self.update_search()
 		event.Skip()
 		
 	def on_button_edit_issue(self, event):
-		print(self.tree_ctrl_1.GetFocusedItem())
+		try:
+			issue_id = self.get_tree_selected_isssue()
+			self.notebook_1.ChangeSelection(1) #move focus to the "create issue" tab
+			issue = self.issue_l.l[issue_id]
+			for field, entry in issue.items():
+				if field in self.important.keys():
+					self.set_chocie_or_text(self.important[field], entry)
+			self.update_search()
+			self.current_issue_id = issue_id
+		except TypeError:
+			pass #TDOD add dialog
 		event.Skip()
 		
 	def on_button_delete_issue(self, event):
-		print("TBI - Delete")
-		event.Skip()
-		
-	def on_cell_select(self, event):
-		print("{} {}".format(event.GetRow(), event.GetCol()))
-		#controller = event.GetEventObject()
-		self.Bind(wx.EVT_KEY_DOWN, self.on_cell_key_down)
-		event.Skip()
-	
-	def on_cell_key_down(self,event):
-		keycode = event.GetKeyCode()
-		#print(keycode)
-		for key in dir(wx.KeyCode):
-			if key == 307: #application key
-				print(key)
+		try:
+			issue_id = self.get_tree_selected_isssue()
+			print(issue_id)
+			self.issue_l.remove_issue(issue_id)
+			self.tree_tab_selected(event)
+		except TypeError:
+			pass #TODO add dialog
 		event.Skip()
 	
 	def do_search(self):
@@ -544,7 +538,28 @@ class TFrame(TestingFrame):
 					return dlg.GetPath()
 				return "Nah"
 		return "Nope"
-
+		
+	def get_tree_selected_isssue(self) -> int:
+		selection = self.tree_ctrl_1.GetSelection()
+		return self.tree_issues[selection]
+	
+	def clear_input(self) -> None:
+		for field, entry in self.important.items():
+			if isinstance(entry,wx.Choice):
+				entry.SetSelection(0)
+			elif isinstance(entry, wx.TextCtrl):
+				entry.SetValue('')
+	
+	def set_chocie_or_text(self, control, value):
+		if isinstance(control, wx.TextCtrl):
+			control.SetValue(value)
+		elif isinstance(control, wx.Choice):	
+			sel_int = control.FindString(value)
+			if sel_int == -1:
+				control.AppendItems([value])
+				sel_int = control.FindString(value)
+			control.SetSelection(sel_int)
+			
 def get_name_from_file(file):
 	"""
 	Given a full file path C:/one/foo.rpt returns foo
