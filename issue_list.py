@@ -45,6 +45,11 @@ class IssueList(Iterable):
 					return item[IssueList.NUM]
 			except KeyError:
 				continue
+				
+	def get(self, num: int) -> Dict[str, str]:
+		for issue in self.l:
+			if issue[IssueList.NUM] == num:
+				return issue
 	
 	def update_issue(self, num: int, new: Dict[str,str]) -> None:
 		for key, value in new.items():
