@@ -245,17 +245,11 @@ class TFrame(TestingFrame):
 
 	def on_choice_platform(self, event):  # wxGlade: TestingFrame.<event_handler>
 		self.update_search()
-		platform_int = self.choice_platform.GetSelection()
-		platform = self.choice_platform.GetString(platform_int)
-		self.db.search(self.Issue.Platform == platform)
 		self.setDirty(True)
 		event.Skip()
 
 	def on_choice_user(self, event):  # wxGlade: TestingFrame.<event_handler>
 		self.update_search()
-		user_type_int = self.choice_user.GetSelection()
-		user_type = self.choice_user.GetString(user_type_int)
-		self.db.search(self.Issue.UserType == user_type)
 		self.setDirty(True)
 		event.Skip()
 
@@ -378,7 +372,7 @@ class TFrame(TestingFrame):
 		try:
 			issue_id = self.get_tree_selected_isssue()
 			self.notebook_1.ChangeSelection(1) #move focus to the "create issue" tab
-			issue = self.issue_l.l[issue_id]
+			issue = self.issue_l.get(issue_id)
 			for field, entry in issue.items():
 				if field in self.important.keys():
 					self.set_chocie_or_text(self.important[field], entry)
@@ -543,12 +537,15 @@ class TFrame(TestingFrame):
 		selection = self.tree_ctrl_1.GetSelection()
 		return self.tree_issues[selection]
 	
-	def clear_input(self) -> None:
+	def clear_input(self, entry):
+		if isinstance(entry,wx.Choice):
+			entry.SetSelection(0)
+		elif isinstance(entry, wx.TextCtrl):
+			entry.SetValue('')
+	
+	def clear_inputs(self) -> None:
 		for field, entry in self.important.items():
-			if isinstance(entry,wx.Choice):
-				entry.SetSelection(0)
-			elif isinstance(entry, wx.TextCtrl):
-				entry.SetValue('')
+			clear_input(entry)
 	
 	def set_chocie_or_text(self, control, value):
 		if isinstance(control, wx.TextCtrl):
