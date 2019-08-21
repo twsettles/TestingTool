@@ -22,7 +22,7 @@ class IssueList(Iterable):
 		issue: a dict of isssue key, value pairs
 		return success: boo
 		'''
-		issue[IssueList.NUM] = int(self.count)
+		issue[IssueList.NUM] = str(self.count)
 		self.count += 1
 		self.l.append(issue)
 		
@@ -45,11 +45,13 @@ class IssueList(Iterable):
 					return item[IssueList.NUM]
 			except KeyError:
 				continue
+		return -1
 				
 	def get(self, num: int) -> Dict[str, str]:
 		for issue in self.l:
 			if issue[IssueList.NUM] == num:
 				return issue
+		return {}
 	
 	def update_issue(self, num: int, new: Dict[str,str]) -> None:
 		for key, value in new.items():

@@ -1,589 +1,141 @@
-from testing_GUI import TestingFrame
+import File_opener as FO
 import intake
+import export
 from database import IssueDatabase
 from issue_list import IssueList
 import wx, gettext, json, os
-from tinydb import Query
-from typing import Optional
+from typing import Optional, List, Dict, IO
 
-COLOR ={"light":{"fg":"#000000", 'bg':'#ffffff'}, \
-		'dark':{"fg":"#ffffff", 'bg':'#080808'}}
+ISSUE_SUMMARY = "Issue Summary"
+ISSUE_DESCRIPTION = "Issue Description"
+STEPS = "Steps to Reproduce"
+REMEDIATTION = "Remediation"
+SEVERITY = "Severity"
+USER_TYPE = intake.USER_TYPE
+CATEGORY = intake.CATEGORY
+BEST_PRACTICE = intake.BEST_PRACTICE
+PLATFORM = intake.PLATFORM
+WCAG = intake.WCAG
+ISSUE_ID = intake.ISSUE_ID
+NUM = IssueList.NUM
 
-class TFrame(TestingFrame):
-	ISSUE_SUMMARY = "Issue Summary"
-	ISSUE_DESCRIPTION = "Issue Description"
-	STEPS = "Steps to Reproduce"
-	REMEDIATTION = "Remediation"
-	SEVERITY = "Severity"
-	USER_TYPE = intake.USER_TYPE
-	PLATFORM = intake.PLATFORM
-	CATEGORY = intake.CATEGORY
-	BEST_PRACTICE = intake.BEST_PRACTICE
-	WCAG = intake.WCAG
-	JSON_WC = "JSON Files (*.json)|*.json|All Files (*.*)|*.*"
-	RPT_WC = "RPT Files (*.rpt)|*.rpt|All Files (*.*)|*.*"
-	
-	def __init__(self, *args, **kwds):
-		import glob
-		TestingFrame.__init__(self,*args, **kwds)
-		uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
-		self.settings = {}
-		self.dark = False
+
+class Hub:
+	def __init__(self) -> None:
+		self.db = IssueDatabase()
+		self.issue_l = IssueList()
+		self.curr_issue_id = -1
+		self.dirty: bool = False
+		self.title:str = 'new'
+		self.title_suffix: str = ' - TTT'
 		
-		self.dbfile = ''
-		self.db = None
 		self.load_db()
-		self.Issue = Query() #TODO remove this and the errors taht causes
-		self.issue_l = IssueList()
-		self.current_issue_id = -1 #used for editing issues
-		
-		self.search_dict = {
-		intake.USER_TYPE: self.choice_user,
-		intake.CATEGORY: self.choice_component,
-		intake.BEST_PRACTICE: self.choice_best_practice,
-		intake.PLATFORM: self.choice_platform,
-		intake.WCAG: self.choice_wcag}
-		
-		for label, choice in self.search_dict.items():
-			list_items = self.db.get_column_names(label)
-			list_items.sort()
-			choice.AppendItems(list_items)
-			
-		self.isDirty: bool = False #used to save the state of changes
-		self.name = " - TTT"
-		self.setTitle("Untitled")
-		self.pathname:str = ''
-		
-		#Fields that are requiree/important
-		self.important = {\
-		TFrame.USER_TYPE: self.choice_user,
-		TFrame.PLATFORM: self.choice_platform,
-		TFrame.ISSUE_SUMMARY: self.text_ctrl_issue_summary,
-		TFrame.STEPS: self.text_ctrl_steps_to_reproduce,
-		TFrame.ISSUE_DESCRIPTION: self.text_ctrl_issue_description,
-		TFrame.SEVERITY: self.choice_severity,
-		TFrame.REMEDIATTION: self.text_ctrl_remediation,
-		TFrame.CATEGORY: self.choice_component,
-		TFrame.BEST_PRACTICE: self.choice_best_practice,
-		TFrame.WCAG: self.choice_wcag}
-		
-		#sample info added to the tree
-		self.root = self.tree_ctrl_1.AddRoot("All Issues")
-		self.tree_issues: Dict = dict()
-
-	def setDirty(self, isDirty):
-		"""
-		Marks the current work as different/same from the saved file
-		"""
-		self.isDirty = isDirty
-		title = self.GetTitle()
-		if isDirty and not title[0] == '*':
-			self.SetTitle('* ' + title)
-		elif not isDirty and title[0] == '*':
-			self.SetTitle(title[2:])
 	
-	def setTitle(self, title):
-		"""
-		Sets the title of the window to the file pathname
-		"""
-		if self.isDirty:	
-			foo = '* ' + title + self.name
+	def load_db(self) -> None:
+		try:
+			self.db = IssueDatabase('db.json')
+		except:
+			try:
+				self.db = IssueDatabase(r'C:\Users\p2763554\Documents\GitHub\TestingTool\db.json')
+			except:
+				try:
+					dlg = FO.FileDialog()
+					path = dlg.get_path(mode = 'Open', wc = FO.JSON_WC)
+					print("database path: ", path)
+					self.db = IssueDatabase(path)
+				except:
+					print("everything broke")
+				
+	def get_possible(self, column_heading: str) -> List[str]:
+		return self.db.get_column_names(column_heading)
+		
+	def set_dirty(self, dirty: bool) -> None:
+		self.dirty = dirty
+	
+	def get_dirty(self) -> bool:
+		return self.dirty
+		
+	def get_title(self) -> str:
+		if self.dirty:
+			return '* ' + self.title + self.title_suffix
 		else:
-			foo = title + self.name
-		self.SetTitle(foo)
-	
-	def on_menu_new(self, event): 
-		"""
-		Called on file>new or ctrl+n
-		"""
-		if not self.safeToQuit():
-			return
-		self.issue_l = IssueList()
-		self.setTitle("Untitled")
-		self.setDirty(False)
-		#clear all selections 
-		self.clear_input()
-		
-	def on_menu_open(self, event):
-		"""
-		Called on file>open or ctrl+o
-		"""
-		if not self.safeToQuit():
-			return
-		
-		filename = ''
-		with wx.FileDialog(self, message="Open a file",	wildcard=TFrame.RPT_WC, style=wx.FD_OPEN |wx.FD_FILE_MUST_EXIST) as dlg:
-		
-			if dlg.ShowModal() == wx.ID_OK:
-				filename = dlg.GetPath()
+			return self.title + self.title_suffix
 			
-			if filename:
-				self.pathname = filename
-				with open(filename,'r') as f:
-					self.issue_l.read_issues(f)
-					f.close()
-					self.text_ctrl_data.ChangeValue(str(self.issue_l))
-					self.setTitle(get_name_from_file(filename))
-				self.setDirty(False)
-			else:
-				print("No file selected")
-
-	def on_menu_save(self, event):  # wxGlade: TestingFrame.<event_handler>
-		"""
-		Called on file>save or ctrl+s
-		"""
-		#TODO: broken because of self.data
-		if self.pathname == "":
-			self.on_menu_save_as(event)
+	def set_title(self, title: str) -> None:
+		self.title = title
+		
+	def compound_search(self, search: Dict[str, str]) -> List:
+		return self.db.compound_search(search)
+	
+	def get_wcag_link(self, wcag: str) -> str:
+		return self.db.get_wcag_link(wcag)
+	
+	def clear_issue_l(self, override: bool) -> bool:
+		if override or not self.dirty:
+			self.issue_l = IssueList()
+			self.title = 'new'
+			self.dirty = False
+			self.curr_issue_id = -1
+			return True
 		else:
-			self.save_as(self.pathname)
+			return False
 	
-	def on_menu_save_as(self, event):
-		"""
-		Called on file>save_as or ctrl+shift+s
-		"""
-		with wx.FileDialog(self, "Save RPT file", wildcard=TFrame.RPT_WC, style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
-			if fileDialog.ShowModal() == wx.ID_CANCEL:
-				return     # the user changed their mind
-
-			# save the current contents in the file
-			pathname = fileDialog.GetPath()
-			self.save_as(pathname)
-			
-	def save_as(self, pathname):
-		"""
-		does the work for both on_menu_save_as and on_menu_save
-		"""
-		with open(pathname, 'w') as file:
-			self.setTitle(get_name_from_file(pathname))
-			self.pathname = pathname
-			
-			self.doSaveData(file)
-			file.close()
-
-	def doSaveData(self, file):
-		"""
-		Does the actual work of saving
-		"""
-		self.setDirty(False)
-		self.issue_l.write_issues(file)
-		
-	def on_menu_import(self, event):  # wxGlade: TestingFrame.<event_handler>
-		"""
-		Called when importing a report. Possibly used by managers (not implemented)
-		"""
-		#TODO, is this neccessary?
-		print("Event handler 'on_menu_import' not implemented!")
-		event.Skip()
-
-	def on_menu_export_pdf(self, event):  # wxGlade: TestingFrame.<event_handler>
-		"""
-		Generates a word doc to be used for a PDF output
-		"""
-		#TODO, need to determine the format
-		print("Event handler 'on_menu_export_pdf' not implemented!")
-		event.Skip()
-
-	def on_menu_export_excel(self, event):  # wxGlade: TestingFrame.<event_handler>
-		"""
-		Generates an excel doc of all issues.  possibly used to upload to JIRA
-		"""
-		import export
-		order_of_keys: List = [\
-		TFrame.PLATFORM,
-		TFrame.USER_TYPE,
-		TFrame.ISSUE_SUMMARY,
-		TFrame.ISSUE_DESCRIPTION,
-		TFrame.STEPS,
-		TFrame.REMEDIATTION,
-		TFrame.SEVERITY,
-		TFrame.CATEGORY,
-		TFrame.BEST_PRACTICE,
-		TFrame.WCAG]
+	def generate_report(self) -> None:
+		order_of_keys: List = [
+		PLATFORM,
+		USER_TYPE,
+		ISSUE_SUMMARY,
+		ISSUE_DESCRIPTION,
+		STEPS,
+		REMEDIATTION,
+		SEVERITY,
+		CATEGORY,
+		BEST_PRACTICE,
+		WCAG]
 		
 		tbw: List[List] = [] #to be written
 		tbw.append(order_of_keys)
 		for entry in self.issue_l:
 			tbw.append(export.dict_to_list(order_of_keys,entry))
 		p_name = r'C:\Users\p2763554\Documents\GitHub\TestingTool\excl.xls'
-		p_name = self.get_file_path("Select file to save to", 'xls', True)
-		export.generate(p_name, tbw)
-		event.Skip()
-
-	def on_menu_exit(self, event):  # wxGlade: TestingFrame.<event_handler>
-		"""
-		Called on file>exit or alt+f4
-		"""
-		if not self.safeToQuit():
-			return
-		self.Close()
+		dlg = FO.FileDialog()
+		p_name = dlg.get_path(mode = 'New', wc = FO.XLS_WC)
 		
-	def on_menu_about(self, event):
-		"""
-		Used to learn about the program e.g. version number...
-		"""
-		self.aboutFrame.show()
+		export.generate(p_name,tbw)
 		
-	def on_menu_dark(self, event):
-		"""
-		Used to turn on/off dark mode
-		"""
-		#TODO, need to refine this, so that users can save this setting
-		self.dark = bool(event.Selection)
-		widgets = getWidgets(self)
-		for widget in widgets:
-			if "SetBackgroundColour" in dir(widget):
-				if self.dark:
-					color = "dark"
-				else:
-					color = "light"
-				
-				widget.SetBackgroundColour(COLOR[color]['bg'])
-				widget.SetForegroundColour(COLOR[color]['fg'])
-		self.Refresh()
-		event.Skip()
-
-	def on_choice_platform(self, event):  # wxGlade: TestingFrame.<event_handler>
-		self.update_search()
-		self.setDirty(True)
-		event.Skip()
-
-	def on_choice_user(self, event):  # wxGlade: TestingFrame.<event_handler>
-		self.update_search()
-		self.setDirty(True)
-		event.Skip()
-
-	def on_choice_priority(self, event):  # wxGlade: TestingFrame.<event_handler>
-		#self.update_search()
-		self.setDirty(True)
-		event.Skip()
-
-	def on_choice_component(self, event):  # wxGlade: TestingFrame.<event_handler>
-		self.update_search()
-		self.setDirty(True)
-		event.Skip()
-
-	def on_choice_best_preactice(self, event):  # wxGlade: TestingFrame.<event_handler>	
-		self.update_search()
-		self.setDirty(True)
-		event.Skip()
-
-	def on_choice_wcag(self, event):  # wxGlade: TestingFrame.<event_handler>
-		self.update_search()
-		self.setDirty(True)
-		#wcag_selection = self.choice_wcag.choices[event.GetSelection()]
-		self.update_wcag_link()
-		event.Skip()
-			
-	def on_text_issue_summary(self, event):
-		self.setDirty(True)
-		event.Skip()
+	def replace_issue_list(self, file: IO[str]) -> None:
+		self.issue_l.read_issues(file)
+	
+	def get_issues(self) -> 'IssueList':
+		return self.issue_l
 		
-	def safeToQuit(self):
-		"""
-		determines if there is unsaved work or if the user is ok with trashing changes
-		"""
-		if self.isDirty:
-			return (wx.MessageBox("You have unsaved work. Are you sure you want to continue?", "Are you sure?", wx.ICON_QUESTION | wx.YES_NO, self) == wx.YES)
-		else:
-			return True
-	
-	def on_notebook_page_changed(self, event):  # wxGlade: TestingFrame.<event_handler>
-		if event.GetSelection() == 4: # raw data tab
-			self.raw_data_tab_selected(event)
-		elif event.GetSelection() == 3: # table tab
-			self.table_tab_selected(event)
-		elif event.GetSelection() == 1: # per issue tab
-			self.create_issue_tab_selected(event)
-		elif event.GetSelection() == 2: # tree Issue tab
-			self.tree_tab_selected(event)
-	
-	def raw_data_tab_selected(self, event):
-		to_place:str = ''
-		for item in self.issue_l:
-			to_place += str(item) + '\n'
-		self.text_ctrl_data.ChangeValue(to_place)
+	def get_issue(self, id: int) -> Dict[str, str]:
+		return self.issue_l.get(id)
 		
-	def table_tab_selected(self, event):
-		self.grid_1.ClearGrid()
-		for i, item in enumerate(self.issue_l):
-			summ = item[TFrame.ISSUE_SUMMARY]
-			sev = item[TFrame.SEVERITY]
-			self.grid_1.SetCellValue(i,0, summ)
-			self.grid_1.SetCellValue(i,1, sev)
-			
-	def create_issue_tab_selected(self, event):
-		#update the count box
-		result = self.do_search()
-		count = len(result)
-		self.text_ctrl_count.ChangeValue(str(count))
+	def close(self) -> None:
+		pass
 	
-	def tree_tab_selected(self, event):
-		self.tree_ctrl_1.DeleteChildren(self.root)
-		for i, item in enumerate(self.issue_l):
-			summ = item[TFrame.ISSUE_SUMMARY]
-			self.tree_issues[self.tree_ctrl_1.AppendItem(self.root, summ)] = item[IssueList.NUM]
+	def get_curr_issue_id(self) -> int:
+		return self.curr_issue_id
 	
-	def on_button_submit(self, event):  # wxGlade: TestingFrame.<event_handler>
-		#TODO - need to validate there is only one issue, based on filter, and save info to a new database
-		data_to_save = dict()
-		data_to_search = dict()
-		done = True #False if there are empty fields
-		to_finish = [] #array to keep track of unfnished fields
-		for key, item in self.important.items():
-			if type(item) == type(wx.TextCtrl()):
-				data_to_save[key] = item.GetValue()
-				
-			elif type(item) == type(wx.Choice()):
-				data_to_save[key] = self.get_choice_string(item)
-			else:
-				print(key)
-			if data_to_save[key] in ('','All'):
-				done = False
-				to_finish.append(key)
-		#test if ready to submit
-		if not done:
-			#pop alert
-			message = "These fields aren't filled in\n"
-			message += '\n'.join(to_finish)
-			message += '\n\nContinue anyway?'
-			continu = (wx.MessageBox(message, "You Fool!", wx.ICON_QUESTION | wx.CANCEL | wx.CANCEL_DEFAULT, self) == wx.OK)
-			if not continu:
-				return
-			for k in to_finish:
-				print(k)
-		#build the search terms
-		result = self.do_search()
-		for elem in result:
-			print(elem[intake.ISSUE_ID])
-		#add issue to database
-		if self.current_issue_id == -1:
-			self.issue_l.add_issue(data_to_save)
-		else:
-			self.issue_l.update_issue(self.current_issue_id, data_to_save)
-			self.current_issue_id = -1
-		#clear the fields on the second tab
-		for field in getWidgets(self.notebook_1_pane_3):
-			self.clear_input(field)
-		self.update_search()
-		event.Skip()
+	def set_curr_issue_id(self, id: int) -> None:
+		self.curr_issue_id = id
+	
+	def add_issue(self, issue) -> None:
+		self.issue_l.add_issue(issue)
+	
+	def update_issue(self, data) -> None:
+		self.issue_l.update_issue(int(self.curr_issue_id), data)
+	
+	def write_issues(self, file: IO[str]) -> None:
+		self.issue_l.write_issues(file)	
 		
-	def on_button_edit_issue(self, event):
-		try:
-			issue_id = self.get_tree_selected_isssue()
-			self.notebook_1.ChangeSelection(1) #move focus to the "create issue" tab
-			issue = self.issue_l.get(issue_id)
-			for field, entry in issue.items():
-				if field in self.important.keys():
-					self.set_chocie_or_text(self.important[field], entry)
-			self.update_search()
-			self.current_issue_id = issue_id
-		except TypeError:
-			pass #TDOD add dialog
-		event.Skip()
-		
-	def on_button_delete_issue(self, event):
-		try:
-			issue_id = self.get_tree_selected_isssue()
-			print(issue_id)
-			self.issue_l.remove_issue(issue_id)
-			self.tree_tab_selected(event)
-		except TypeError:
-			pass #TODO add dialog
-		event.Skip()
+	def remove_issue(self, id: int) -> None:
+		self.issue_l.remove_issue(id)
 	
-	def do_search(self):
-		'''
-		Performs a search based on the current selection of the wxChoices
-		'''
-		dd = dict()
-		for k, v in self.search_dict.items():
-			selection = self.get_choice_string(v)
-			if not selection == "All":
-				dd[k] = selection
-		return self.db.compound_search(dd)
-	
-	def update_wcag_link(self):
-		link = self.db.get_wcag_link(self.get_choice_string(self.choice_wcag))
-		self.text_ctrl_wcag.SetValue(link)
-		
-	def update_search(self):
-		"""
-		Generic function that calculates and updates the choices in a wxChoice
-		Called by all of the wxChoices that can change search results
-		"""
-		for string, choice in self.search_dict.items():
-			selection = choice.GetString(choice.GetSelection())
-			#print(string + ": " + selection)
-			
-			#remove the current option from the dict for the search
-			copy_string_dict = dict()
-			for k,v in self.search_dict.items():
-				if not "All" == self.get_choice_string(v):
-					copy_string_dict[k] = self.get_choice_string(v)
-					
-			if string in copy_string_dict:
-				try:
-					del copy_string_dict[string]
-				except KeyError:
-					pass
-			#print("copy string dict:\t"+str(copy_string_dict))
-			results = self.db.compound_search(copy_string_dict)
-			#print("len(results):\t"+str(len(results)))
-			list_to_append = []
-			#print("results[0]:\t" + str(results[0]))
-			#print("string:\t"+ string)
-			for item in results:
-				#print(item[k])
-				list_to_append.append(item[string])
-			list_to_append = list(set(list_to_append))
-			self.reset_choices(choice,list_to_append)
-		self.update_wcag_link()
-		result = self.do_search()
-		count = len(result)
-		self.text_ctrl_count.ChangeValue(str(count))
-		
-	def get_choice_string(self,choice):
-		"""
-		Given a wxChoice, returns its selected string
-		"""
-		selection_int = choice.GetSelection()
-		return choice.GetString(selection_int)
-		
-	def reset_choices(self,choice, choices):
-		"""
-		Given a list of choices, and a wxChoice, it sets the choicse to the list
-		and retains the previous selection
-		"""
-		current = self.get_choice_string(choice)
-		choice.Clear()
-		choice.AppendItems(["All"])
-		choices = list(set(choices))
-		choices.sort()
-		choice.AppendItems(choices)
-		''' removed because it can trap the user if two fields are pigeon-holed
-		if len(choices) == 1:
-			sel_int = 1
-		else:
-		'''
-		sel_int = choice.FindString(current)
-		choice.SetSelection(sel_int)
-	
-	def load_db(self):
-		try:
-			self.db = IssueDatabase('db.json')
-		except:
-			try:
-				path = self.get_file_path("Open the issues database file", 'json')
-				self.db = IssueDatabase(path)
-			except:
-				print("everything broke")
-	
-	def load_settings(self): #TODO
-		"""
-		Load settings from "settings.txt"
-		# Not working correctly
-		"""
-		try:
-			f = open(self.settings_file, 'rt')
-			string = f.read()
-		except IOError:
-			settings = self.get_file_path('Open the settings file', 'txt')
-			f = open(settings, 'wt')
-			string = '{"dark": False, "dbfile":'+self.dbfile + '}'
-		finally:
-			if string:
-				try:
-					settings_handler = eval(string)
-					if not type(settings_handler) == type(dict()):
-						raise KeyError
-				except:
-					settings_handler = {'dark': False, "dbfile":"db.json"}
-			else:
-				settings_handler = {'dark': False, "dbfile":"db.json"}
-			#dark
-			try:
-				self.settings['dark'] = settings_handler['dark']
-			except KeyError:
-				self.settings['dark'] = False
-			
-			#database file
-			try:
-				self.dbfile = settings_handler['dbfile']
-			except KeyError:
-				self.dbfile = "db.json"
-			
-			#save the settings for next time
-			string = str({'dark': self.dark, 'dbfile': self.dbfile})
-			if not 'w' in f.mode:
-				f.close()
-				f = open(settings_file, 'wt')
-			f.write(string)
-			f.close()
-
-	def get_file_path(self, mess: str, ext: str, create: Optional[bool] = False):
-		wc_str = ext.upper() + ' Files (*.' + ext + ')|*.' + ext
-		if create:
-			stl = wx.FD_OPEN
-		else:
-			stl = wx.FD_OPEN |wx.FD_FILE_MUST_EXIST
-		with wx.FileDialog(self, message = mess, wildcard=wc_str, style=stl) as dlg:
-				if dlg.ShowModal() == wx.ID_OK:
-					return dlg.GetPath()
-				return "Nah"
-		return "Nope"
-		
-	def get_tree_selected_isssue(self) -> int:
-		selection = self.tree_ctrl_1.GetSelection()
-		return self.tree_issues[selection]
-	
-	def clear_input(self, entry):
-		if isinstance(entry,wx.Choice):
-			entry.SetSelection(0)
-		elif isinstance(entry, wx.TextCtrl):
-			entry.SetValue('')
-	
-	def clear_inputs(self) -> None:
-		for field, entry in self.important.items():
-			clear_input(entry)
-	
-	def set_chocie_or_text(self, control, value):
-		if isinstance(control, wx.TextCtrl):
-			control.SetValue(value)
-		elif isinstance(control, wx.Choice):	
-			sel_int = control.FindString(value)
-			if sel_int == -1:
-				control.AppendItems([value])
-				sel_int = control.FindString(value)
-			control.SetSelection(sel_int)
-			
-def get_name_from_file(file):
-	"""
-	Given a full file path C:/one/foo.rpt returns foo
-	Used to get the title of the window
-	"""
-	broken_file = file.split(os.sep)
-	return (broken_file[-1][:-4])
-
-def getWidgets(parent):
-	"""
-	Return a list of all the child widgets
-	"""
-	items = [parent]
-	for item in parent.GetChildren():
-		items.append(item)
-		if hasattr(item, "GetChildren"):
-			for child in item.GetChildren():
-				items.extend(getWidgets(child))
-	return items
-	
-class MyApp(wx.App):
-	def OnInit(self):
-		self.frame = TFrame(None, wx.ID_ANY, "")
-		self.SetTopWindow(self.frame)
-		self.frame.Show()
-		return True
+def main() -> None:
+	hub = Hub()
 
 if __name__ == "__main__":
-	app = MyApp(0)
-	app.MainLoop()
+	main()
+	

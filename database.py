@@ -4,7 +4,10 @@ from tinydb import TinyDB, Query, where
 
 class IssueDatabase(TinyDB):
 	def __init__(self,*args, **kwds):
-		TinyDB.__init__(self,*args, **kwds)
+		if (not args) and (not kwds):
+			pass
+		else:
+			TinyDB.__init__(self,*args, **kwds)
 	
 	def compound_search(self, dd: Dict[str, str]) -> List:
 		"""
