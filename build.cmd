@@ -1,4 +1,3 @@
 @echo off
-mypy %1
-ECHO --- End Mypy ---
-python -i %1
+mypy %1 --ignore-missing-imports
+pause
