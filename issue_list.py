@@ -7,6 +7,7 @@ class IssueList(Iterable):
 		self.l = [] #type: List[Dict]
 		self.count: int = 0 #used as a refernce for creating an index
 							#if issues are delete, this wil liekly be wrong
+		self.notes: str = ''
 		
 	def __str__(self) -> str:
 		return str(self.l)

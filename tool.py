@@ -19,7 +19,6 @@ WCAG = intake.WCAG
 ISSUE_ID = intake.ISSUE_ID
 NUM = IssueList.NUM
 
-
 class Hub:
 	def __init__(self) -> None:
 		self.db = IssueDatabase()
@@ -132,6 +131,12 @@ class Hub:
 		
 	def remove_issue(self, id: int) -> None:
 		self.issue_l.remove_issue(id)
+		
+	def set_notes(self, notes: str) -> None:
+		self.issue_l.notes = notes
+		
+	def get_notes(self) -> str:
+		return self.issue_l.notes
 	
 def main() -> None:
 	hub = Hub()
