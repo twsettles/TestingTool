@@ -4,7 +4,7 @@ import export
 from database import IssueDatabase
 from issue_list import IssueList
 import wx, gettext, json, os
-from typing import Optional, List, Dict, IO
+from typing import Optional, List, Dict, IO, Iterable
 
 ISSUE_SUMMARY = "Issue Summary"
 ISSUE_DESCRIPTION = "Issue Description"
@@ -137,10 +137,28 @@ class Hub:
 		
 	def get_notes(self) -> str:
 		return self.issue_l.notes
+		
+	def get_platform(self) -> str:
+		platforms= []
+		for issue in self.issue_l:
+			platforms.append(issue[PLATFORM])
+		print(platforms)
+		if is_same(platforms) and bool(platforms):
+			return platforms[0]
+		return ''
+	
+def is_same(obj: Iterable) -> bool:
+	for i, j in zip(obj[:-1], obj[1:]):
+		if not i == j:
+			return False
+	return True
 	
 def main() -> None:
 	hub = Hub()
 
 if __name__ == "__main__":
+	assert is_same([4]*5)
+	assert not is_same([4,4,4,4,3])
+	print(is_same([]))
 	main()
 	

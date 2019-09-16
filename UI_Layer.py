@@ -2,7 +2,7 @@ from testing_GUI import TestingFrame
 import tool
 import File_opener as FO
 import wx, os, sys
-from typing import Optional, List, Dict, IO
+from typing import Optional, List, Dict, IO, Iterable
 
 class TFrame(TestingFrame):
 	def __init__(self, *args, **kwds) -> None:
@@ -83,6 +83,9 @@ class TFrame(TestingFrame):
 				self.set_title()
 				self.hub.set_curr_issue_id(-1)
 				self.text_ctrl_notes.SetValue(self.hub.get_notes())
+				platform = self.hub.get_platform()
+				if platform:
+					set_chocie_or_text(self.important[tool.PLATFORM],platform)
 				self.set_dirty(False)
 		else:
 			print("No file selected")
@@ -343,6 +346,7 @@ class TFrame(TestingFrame):
 			clear_input(entry)
 
 	def on_generic(self, event, update:bool = True) -> None:
+		print(event.__dict__)
 		if update: self.update_search()
 		self.set_dirty(True)
 		event.Skip()
@@ -396,7 +400,7 @@ def getWidgets(parent) -> List:
 			for child in item.GetChildren():
 				items.extend(getWidgets(child))
 	return items
-	
+		
 class MyApp(wx.App):
 	def OnInit(self) -> bool:
 		self.frame = TFrame(None, wx.ID_ANY, "")
