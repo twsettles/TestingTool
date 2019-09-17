@@ -38,7 +38,7 @@ class Hub:
 				self.db = IssueDatabase(r'C:\Users\p2763554\Documents\GitHub\TestingTool\db.json')
 			except:
 				try:
-					dlg = FO.FileDialog()
+					dlg = FO.FileDialog(self)
 					path = dlg.get_path(mode = 'Open', wc = FO.JSON_WC)
 					print("database path: ", path)
 					self.db = IssueDatabase(path)
@@ -97,7 +97,7 @@ class Hub:
 		for entry in self.issue_l:
 			tbw.append(export.dict_to_list(order_of_keys,entry))
 		p_name = r'C:\Users\p2763554\Documents\GitHub\TestingTool\excl.xls'
-		dlg = FO.FileDialog()
+		dlg = FO.FileDialog(self)
 		p_name = dlg.get_path(mode = 'New', wc = FO.XLS_WC)
 		
 		export.generate(p_name,tbw)
