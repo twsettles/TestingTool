@@ -36,8 +36,6 @@ class FileDialog():
 		path = dialog.GetPath()
 		return path
 		
-	
-		
 def main() -> None:
 	class MyApp(wx.App):
 		def OnInit(self):

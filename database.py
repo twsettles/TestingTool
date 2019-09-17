@@ -1,6 +1,8 @@
-import wx, intake
+import wx
 from typing import Dict, List
 from tinydb import TinyDB, Query, where
+
+import intake
 
 class IssueDatabase(TinyDB):
 	def __init__(self,*args, **kwds):

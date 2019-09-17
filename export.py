@@ -1,5 +1,5 @@
-from typing import List, Dict
 import xlwt
+from typing import List, Dict
 
 def main() -> None:
 	pathname: str = r'C:\Users\p2763554\Documents\GitHub\TestingTool\excl.xls'
@@ -37,3 +37,4 @@ def dict_to_list(keys: List, d: Dict) -> List:
 
 if __name__ == "__main__":
 	main()
+	

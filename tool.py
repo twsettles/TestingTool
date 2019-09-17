@@ -1,10 +1,11 @@
-import File_opener as FO
-import intake
-import export
-from database import IssueDatabase
-from issue_list import IssueList
 import wx, gettext, json, os
 from typing import Optional, List, Dict, IO, Iterable
+
+import intake
+import export
+import File_opener as FO
+from database import IssueDatabase
+from issue_list import IssueList
 
 ISSUE_SUMMARY = "Issue Summary"
 ISSUE_DESCRIPTION = "Issue Description"
@@ -55,10 +56,8 @@ class Hub:
 		return self.dirty
 		
 	def get_title(self) -> str:
-		if self.dirty:
-			return '* ' + self.title + self.title_suffix
-		else:
-			return self.title + self.title_suffix
+		msg = '* ' if self.dirty else ''
+		return msg + self.title + self.title_suffix
 			
 	def set_title(self, title: str) -> None:
 		self.title = title
@@ -147,7 +146,7 @@ class Hub:
 			return platforms[0]
 		return ''
 	
-def is_same(obj: Iterable) -> bool:
+def is_same(obj: Iterable[Any]) -> bool:
 	for i, j in zip(obj[:-1], obj[1:]):
 		if not i == j:
 			return False
@@ -161,4 +160,3 @@ if __name__ == "__main__":
 	assert not is_same([4,4,4,4,3])
 	print(is_same([]))
 	main()
-	

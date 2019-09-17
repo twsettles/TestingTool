@@ -1,5 +1,5 @@
-from typing import List, Dict, IO, Iterator, Iterable, Any, Tuple
 import json, sys
+from typing import List, Dict, IO, Iterator, Iterable, Any, Tuple
 
 class IssueList(Iterable):
 	NUM = 'num'
@@ -80,4 +80,3 @@ def main() -> None:
 	
 if __name__ == "__main__":
 	main()
-		
