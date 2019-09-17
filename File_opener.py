@@ -7,9 +7,9 @@ XLS_WC = "Excel Files (*.xls)|*.xls"
 ALL_WC = "All Files (*.*)|*.*"
 
 class FileDialog():
-	def __init__(self):
-		self.app= wx.App()
-		self.frame = wx.Frame(None,wx.ID_ANY,'')
+	def __init__(self, parent):
+		self.parent = parent
+		self.frame = wx.Frame(parent,wx.ID_ANY,'')
 	
 	def tear_down(self):
 		self.frame.Close()
@@ -31,15 +31,21 @@ class FileDialog():
 			msg = 'Malfomred mode'
 			arg = wx.FD_DEFAULT_STYLE
 		
-		dialog = wx.FileDialog(self.frame, msg, '', '', wc, arg)
+		dialog = wx.FileDialog(self.parent, msg, '', '', wc, arg)
 		dialog.ShowModal()
 		path = dialog.GetPath()
 		return path
 		
 	
 		
-def main() -> None:		
-	print((FileDialog()).get_path(mode = 'Save', wc = PY_WC))
+def main() -> None:
+	class MyApp(wx.App):
+		def OnInit(self):
+			self.frame = wx.Frame(None,wx.ID_ANY, '')
+			self.frame.Show()
+			return True
+	app = MyApp(0)
+	print((FileDialog(app.frame)).get_path(mode = 'Save', wc = PY_WC))
 		
 if __name__ == '__main__':
 	main()

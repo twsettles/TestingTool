@@ -10,7 +10,7 @@ class TFrame(TestingFrame):
 		self.dark: bool = False
 		self.pathname:str = ''
 		self.hub = tool.Hub() #interacts with all other modules
-		self.f_dlg = FO.FileDialog()
+		self.f_dlg = FO.FileDialog(self)
 		
 		self.search_dict = {
 		tool.USER_TYPE: self.choice_user,
