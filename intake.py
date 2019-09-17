@@ -1,5 +1,4 @@
-import glob
-import os
+import glob, os
 from tinydb import TinyDB, Query
 from typing import List
 
@@ -12,9 +11,8 @@ IMPACT = "Impact"
 WCAG = "WCAG"
 LINK = "Link"
 
-#given an excel file path, return an array in the format data[sheet][row][column]
 def read_xlsx(file):
-	#print((file))
+	'''given an excel file path, return an array in the format data[sheet][row][column]'''
 	import xlrd
 	book = xlrd.open_workbook(file)
 	data = [] #type: List[List]
@@ -46,9 +44,7 @@ def build_db(issues, pathname: str) -> None:
 							LINK: issue[6]})
 		db.close()
 	
-
-if __name__ == "__main__":
-
+def main() -> None:
 	uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
 	files = glob.glob(uppath(__file__, 1) + os.sep + "*.xlsx")
 	issues:List = []
@@ -67,3 +63,6 @@ if __name__ == "__main__":
 	print(len(user_types))
 	for user_type in user_types:
 		print(user_type)
+		
+if __name__ == '__main__':
+	main()
